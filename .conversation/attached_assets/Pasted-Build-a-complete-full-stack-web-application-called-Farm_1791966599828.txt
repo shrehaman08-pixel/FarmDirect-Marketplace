@@ -1,0 +1,90 @@
+Build a complete full-stack web application called "FarmDirect" — a Farmer-to-Buyer Marketplace that connects farmers directly with restaurants, retailers, wholesalers, and consumers, removing unnecessary middlemen. Farmers list produce at prices they set; buyers browse, order, and negotiate bulk deals directly.
+
+TECH STACK (strict)
+- Frontend: React + Vite + TypeScript + Tailwind CSS + React Router + TanStack Query
+- Backend and data store: Supabase ONLY (Postgres, Auth, Storage, Edge Functions/RPC)
+- Do NOT use Replit Database, Replit Auth, or Replit Object Storage. The project must run anywhere.
+- Mobile-first responsive UI (many farmers will use phones). Simple, large-touch-target design.
+
+ROLES
+1. farmer: manages profile and produce listings, receives and fulfils orders, responds to bulk offers.
+2. buyer: has buyer_type = consumer | restaurant | retailer | wholesaler. Browses, orders, sends bulk offers, reviews.
+3. admin: verifies farmers, manages categories, moderates listings and users, sees platform stats.
+Role is chosen at signup (admin is assigned manually in the database).
+
+CORE FEATURES
+Farmer:
+- Profile: name, phone, village/district/state, farm size, certifications (e.g. organic), bio, verification status.
+- Product CRUD: name, category, description, price per unit, unit (kg/quintal/dozen/piece), available quantity, minimum order quantity, harvest date, pickup/delivery options, up to 5 images, active/inactive.
+- Orders dashboard: incoming orders; accept / reject / mark packed / mark delivered.
+- Offers inbox: view bulk offers, accept / reject / counter.
+- Earnings summary (total sales, orders per month).
+
+Buyer:
+- Browse and search products with filters: category, price range, location/district, organic, availability, sort by price/newest/rating.
+- Product detail page with farmer info, rating, and reviews.
+- Cart and checkout. A cart may contain items from multiple farmers; checkout splits into one order per farmer.
+- Bulk offer (RFQ): wholesalers and restaurants propose quantity and price per unit to a farmer; farmer can accept, reject, or counter. Accepted offers become orders.
+- Order history and tracking, reorder, review after delivery.
+- Saved favourite farmers.
+
+Shared:
+- In-app messaging between a buyer and a farmer, tied to a product or order.
+- Notifications (new order, status change, new offer, new message).
+- Price transparency: show a "reference market price" field on listings so buyers see the savings.
+
+Admin:
+- Approve or reject farmer verification, manage categories, deactivate users or listings, dashboard with totals (users, orders, GMV).
+
+ORDER FLOW
+pending -> accepted -> packed -> out_for_delivery/ready_for_pickup -> delivered; also rejected and cancelled.
+Payment for MVP: Cash on Delivery or Pay on Pickup, plus a payment_status field (pending/paid). Leave a clean abstraction so Razorpay can be added later. No real payment integration now.
+Order placement must be atomic: use a Postgres function (RPC) that checks stock, decrements quantity, creates orders and order_items in one transaction. Never trust prices or totals from the client.
+
+DATABASE (create via /supabase/migrations/*.sql)
+- profiles (id = auth.users.id, role, full_name, phone, avatar_url, created_at)
+- farmer_profiles (user_id, district, state, village, farm_size, certifications, bio, verification_status)
+- buyer_profiles (user_id, buyer_type, business_name, address, gst_number nullable)
+- categories (id, name, icon)
+- products (id, farmer_id, category_id, name, description, price, unit, quantity_available, min_order_qty, harvest_date, is_organic, reference_price, is_active, created_at)
+- product_images (id, product_id, url, position)
+- cart_items (id, buyer_id, product_id, quantity)
+- orders (id, buyer_id, farmer_id, status, payment_method, payment_status, delivery_type, delivery_address, total_amount, created_at)
+- order_items (id, order_id, product_id, quantity, unit_price)
+- offers (id, buyer_id, farmer_id, product_id, quantity, offered_price, status, counter_price, message, created_at)
+- reviews (id, order_id, buyer_id, farmer_id, product_id, rating 1-5, comment)
+- messages (id, sender_id, receiver_id, product_id nullable, order_id nullable, body, read_at, created_at)
+- notifications (id, user_id, type, title, body, is_read, created_at)
+- favourites (buyer_id, farmer_id)
+Add primary and foreign keys, indexes on frequently filtered columns (category_id, farmer_id, district, status), timestamps, and CHECK constraints (price > 0, quantity >= 0, rating 1-5).
+Add /supabase/seed.sql with categories (vegetables, fruits, grains, pulses, dairy, spices) and sample farmers, buyers, and products.
+
+SECURITY (Row Level Security on EVERY table)
+- Public (or any logged-in user) can read active products, categories, and approved farmer profiles.
+- Farmers can only create/update/delete their own products and see orders/offers addressed to them.
+- Buyers can only see their own cart, orders, offers, and favourites.
+- Messages are visible only to sender and receiver.
+- Admin can read and manage everything. Prevent users from changing their own role.
+- Storage bucket "product-images": public read, write only by the owning farmer.
+- Never expose the service_role key in frontend code.
+
+AUTH
+Supabase email/password auth, signup with role selection, protected routes by role, session persistence, password reset.
+
+FRONTEND/BACKEND CONNECTION
+- Single Supabase client in src/lib/supabase.ts using VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.
+- Data access in src/services/ (one file per entity), hooks in src/hooks/, no direct DB calls inside components.
+- Loading, empty, and error states on every screen. Toast notifications for actions.
+- Use Supabase Realtime for messages and notifications.
+
+SCREENS
+Public: landing page, browse/search, product detail, farmer public profile, login, signup.
+Farmer: dashboard, my products (list + add/edit), orders, offers, messages, profile.
+Buyer: cart, checkout, my orders, order detail, my offers, favourites, messages, profile.
+Admin: dashboard, farmer verification queue, users, listings, categories.
+
+DELIVERABLES
+- Clean folder structure, .env.example (names only), .env in .gitignore.
+- README.md: create Supabase project, run migrations and seed, set env vars, npm install, npm run dev, deployment notes.
+- Work step by step and summarise after each step: 1) scaffold and layout, 2) database + RLS + seed, 3) auth and roles, 4) farmer product management, 5) buyer browse and cart, 6) orders via RPC, 7) offers and messaging, 8) admin, 9) polish.
+Stop after each step and wait for my confirmation before continuing.

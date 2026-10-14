@@ -1,0 +1,1 @@
+- [FarmDirect Supabase stack](supabase-stack.md) — use Supabase only; do not substitute Replit database, auth, or storage.
